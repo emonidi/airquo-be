@@ -1,6 +1,10 @@
 const express = require("express");
 const fetch = require("node-fetch");
 const cors = require("cors");
+const { URLSearchParams } = require('url');
+
+const FormData = require('form-data');
+
 const app = express();
 app.use(cors());
 
@@ -13,7 +17,7 @@ async function getStations() {
   aqiStations.data = [...aqiStations.data, ...dlStations];
   stations = aqiStations;
 
-  setInterval(getStations, 60000);
+  getStations();
 }
 
 getStations();
@@ -25,32 +29,9 @@ app.get("/", async function(req, res) {
 app.listen(3000);
 
 async function getAqiStations(bounds = [90, 180, -90, -180]) {
-  // try {
-  //   const res = await fetch(
-  //     `https://api.waqi.info/map/bounds/?token=c472110c54ce8941e8a361c36bdbd21613f9ab69&latlng=${bounds.join(
-  //       ","
-  //     )}`
-  //   );
-  //   console.log(
-  //     `https://api.waqi.info/map/bounds/?token=c472110c54ce8941e8a361c36bdbd21613f9ab69&latlng=${bounds.join(
-  //       ","
-  //     )}`
-  //   );
-  //   let data = await res.json();
-  //   data.data = data.data.map((el, i) => ({
-  //     ...el,
-  //     uid: i
-  //   }));
-  //   return data;
-  // } catch (e) {
-  //   console.log(e);
-  // }
   try {
-    const urlRes = await fetch(
-      `https://waqi.info/rtdata/?_=${Math.floor(Date.now() / 1000)}`
-    );
-    console.log(`https://waqi.info/rtdata/?_=${Math.floor(Date.now() / 1000)}`);
-    const urlData = await urlRes.json();
+    
+    const urlData = await getUrlRes();
     const res = await fetch(
       `https://waqi.info/rtdata/${urlData.path}/000.json`
     );
@@ -67,21 +48,52 @@ async function getAqiStations(bounds = [90, 180, -90, -180]) {
         }
       };
     });
+    const params = new URLSearchParams();
+
+    params.append('specie', 'pm25');
     const specieRes = await fetch(`https://api.waqi.info/map/realtime/specie`, {
-      method: "POST",
-      body: JSON.stringify({ specie: "o3" }),
+      method: "post",
+      body: params,
       headers: {
         // "Content-Type": "application/json"
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Accept": "*/*",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
+        "dnt":"1",
+        "accept-encoding": "gzip, deflate, br"
       }
     });
     const specie = await specieRes.json();
-    console.log(specie);
+    let specieObj = {}
+    for(let obj in specie.data.values){
+      const o = specie.data.values[obj];
+      for(let v in o){
+          specieObj[v] = parseInt(o[v]);
+      }
+    }
+    data = data
+    .filter(el => specieObj[el.uid])
+    .map((elem,i)=>{
+      return{
+        ...elem,
+        uid:elem.uid.replace("S",'').replace(/0/ig,''),
+        aqi:specieObj[elem.uid] || "-"
+      }
+    })
     return { data };
   } catch (e) {
     console.log(e);
   }
 }
+
+async function getUrlRes(){
+  const urlRes = await fetch(
+    `https://waqi.info/rtdata/?_=${Math.floor(Date.now() / 1000)}`
+  );
+  return await urlRes.json()
+}
+
 async function getLDStations(aqiStationsLength) {
   try {
     const res = await fetch(
