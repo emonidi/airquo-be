@@ -26,7 +26,7 @@ app.get("/", async function(req, res) {
   res.json(stations);
 });
 
-app.listen(3000);
+app.listen(process.env.PORT || 3000);
 
 async function getAqiStations(bounds = [90, 180, -90, -180]) {
   try {
