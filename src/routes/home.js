@@ -97,7 +97,7 @@ class HomeController{
               return {
                 lat: parseFloat(item.location.latitude),
                 lon: parseFloat(item.location.longitude),
-                uid: `LD${aqiStationsLength + index}`,
+                uid: `LD${item.id}`,
                 aqi: self.getP1Value(item, index)
               };
             });
